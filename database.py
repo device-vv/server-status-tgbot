@@ -7,7 +7,7 @@ load_dotenv()
 DATABASE_FILE = os.getenv('DATABASE_FILE', 'monitoring_bot.db')
 logger = logging.getLogger(__name__)
 
-def add_column_if_not_exists(db_file, table_name, column_name, column_type):
+def add_column_if_not_exists(db_file, table_name, column_name, column_type, default_value=None):
     """Safely adds a new column to a table if it doesn't already exist."""
     with sqlite3.connect(db_file) as conn:
         cursor = conn.cursor()
@@ -15,7 +15,10 @@ def add_column_if_not_exists(db_file, table_name, column_name, column_type):
         columns = [info[1] for info in cursor.fetchall()]
         if column_name not in columns:
             logger.info(f"Adding column '{column_name}' to table '{table_name}'...")
-            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+            alter_query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+            if default_value is not None:
+                alter_query += f" DEFAULT '{default_value}'"
+            cursor.execute(alter_query)
             conn.commit()
             logger.info("Column added successfully.")
         else:
@@ -37,17 +40,21 @@ def initialize_db():
         ''')
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS admins (
-                chat_id INTEGER PRIMARY KEY
+                chat_id INTEGER PRIMARY KEY,
+                language TEXT DEFAULT 'ru'
             )
         ''')
         conn.commit()
+    # Perform maintenance on startup
+    add_column_if_not_exists(DATABASE_FILE, 'admins', 'language', 'TEXT', default_value='ru')
+
 
 # --- Admin Management Functions ---
-def add_admin(chat_id):
-    """Adds a new admin session."""
+def add_admin(chat_id, language='ru'):
+    """Adds a new admin session with a default language."""
     with sqlite3.connect(DATABASE_FILE) as conn:
         cursor = conn.cursor()
-        cursor.execute("INSERT OR IGNORE INTO admins (chat_id) VALUES (?)", (chat_id,))
+        cursor.execute("INSERT OR IGNORE INTO admins (chat_id, language) VALUES (?, ?)", (chat_id, language))
         conn.commit()
 
 def remove_admin(chat_id):
@@ -58,11 +65,26 @@ def remove_admin(chat_id):
         conn.commit()
 
 def get_admins():
-    """Returns chat_id of all active admins."""
+    """Returns a list of (chat_id, language) tuples for all active admins."""
     with sqlite3.connect(DATABASE_FILE) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT chat_id FROM admins")
-        return [row[0] for row in cursor.fetchall()]
+        cursor.execute("SELECT chat_id, language FROM admins")
+        return cursor.fetchall()
+
+def get_admin_language(chat_id):
+    """Gets the language for a specific admin."""
+    with sqlite3.connect(DATABASE_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT language FROM admins WHERE chat_id = ?", (chat_id,))
+        result = cursor.fetchone()
+        return result[0] if result else 'ru'
+
+def set_admin_language(chat_id, language):
+    """Sets the language for a specific admin."""
+    with sqlite3.connect(DATABASE_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE admins SET language = ? WHERE chat_id = ?", (language, chat_id))
+        conn.commit()
 
 def get_admin_count():
     """Counts the number of active admin sessions."""
@@ -73,7 +95,8 @@ def get_admin_count():
 
 def is_admin(chat_id):
     """Checks if a user is a logged-in admin."""
-    return chat_id in get_admins()
+    admin_ids = [admin[0] for admin in get_admins()]
+    return chat_id in admin_ids
 # --- End Admin Management Functions ---
 
 def add_server(ip_address, country_code, name):
@@ -143,4 +166,5 @@ if __name__ == '__main__':
     print("Performing database maintenance...")
     initialize_db()
     add_column_if_not_exists(DATABASE_FILE, 'servers', 'name', 'TEXT')
+    add_column_if_not_exists(DATABASE_FILE, 'admins', 'language', 'TEXT', default_value='ru')
     print("Database maintenance complete.")

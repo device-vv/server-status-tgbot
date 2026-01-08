@@ -1,13 +1,16 @@
 import asyncio
 import re
+import logging
 from collections import namedtuple
+from localization import get_translation
 
+logger = logging.getLogger(__name__)
 PingResult = namedtuple('PingResult', ['status', 'packet_loss', 'min_rtt', 'avg_rtt', 'max_rtt'])
 
 async def do_ping(ip_address: str) -> PingResult:
     """
-    Выполняет системную команду ping и парсит ее вывод.
-    Увеличено время ожидания до 5 секунд для большей надежности.
+    Performs a system ping command and parses its output.
+    Increased timeout to 5 seconds for more reliability.
     """
     command = f"ping -c 4 -W 5 {ip_address}"
     process = await asyncio.create_subprocess_shell(
@@ -43,61 +46,67 @@ async def do_ping(ip_address: str) -> PingResult:
         max_rtt=max_rtt
     )
 
-async def get_beautiful_report(ip_address: str, country_name: str, flag_emoji: str) -> str:
+async def get_beautiful_report(ip_address: str, country_name: str, flag_emoji: str, lang: str = 'ru') -> str:
     """
-    Выполняет пинг и генерирует красивый текстовый отчет.
+    Performs a ping and generates a beautiful, localized text report.
     """
     try:
         result = await do_ping(ip_address)
 
-        header = f"📊 *Результат проверки для* {flag_emoji} *{country_name}* (`{ip_address}`)\n\n"
+        header = get_translation(lang, 'ping_report_title', flag=flag_emoji, name=country_name, ip=ip_address)
 
         if result.status == 'UP':
-            status_line = f"✅ *Статус:* `ОНЛАЙН`"
+            status_line = get_translation(lang, 'ping_status_online')
             report = (
-                f"{header}"
+                f"{header}\n\n"
                 f"{status_line}\n\n"
-                f"🌍 *Пинг (RTT)*:\n"
-                f"   - Мин: `{result.min_rtt:.3f} ms`\n"
-                f"   - Сред: `{result.avg_rtt:.3f} ms`\n"
-                f"   - Макс: `{result.max_rtt:.3f} ms`\n\n"
-                f"📉 *Потеря пакетов:* `{result.packet_loss}%`"
+                f"{get_translation(lang, 'ping_rtt_title')}\n"
+                f"{get_translation(lang, 'ping_rtt_min', ms=result.min_rtt)}\n"
+                f"{get_translation(lang, 'ping_rtt_avg', ms=result.avg_rtt)}\n"
+                f"{get_translation(lang, 'ping_rtt_max', ms=result.max_rtt)}\n\n"
+                f"{get_translation(lang, 'ping_packet_loss', loss=result.packet_loss)}"
             )
         else:
-            status_line = f"❌ *Статус:* `ОФФЛАЙН`"
+            status_line = get_translation(lang, 'ping_status_offline')
             report = (
-                f"{header}"
+                f"{header}\n\n"
                 f"{status_line}\n\n"
-                f"Причина: Сервер не отвечает на ICMP-запросы (пинг)."
+                f"{get_translation(lang, 'ping_offline_reason')}"
             )
         
         return report
 
     except Exception as e:
-        logger.error(f"Ошибка при создании отчета для {ip_address}: {e}")
-        return f"Произошла ошибка при проверке `{ip_address}`."
+        logger.error(f"Error creating report for {ip_address}: {e}")
+        return get_translation(lang, 'ping_error', ip=ip_address)
 
 if __name__ == '__main__':
-    # Пример использования
-    import logging
-    logger = logging.getLogger(__name__)
-    
+    # Example usage
     async def test_ping():
-        ip_to_test = "192.0.2.1" # Test IP - должен быть оффлайн
-        country_name_test = "Пример (Оффлайн)"
+        ip_to_test = "192.0.2.1" # Test IP - should be offline
+        country_name_test = "Example (Offline)"
         flag_test = "🏳️"
         
-        print(f"--- Тестирование {ip_to_test} ---")
-        report = await get_beautiful_report(ip_to_test, country_name_test, flag_test)
-        print(report.replace('*', '').replace('`', ''))
+        print("--- Testing Offline (RU) ---")
+        report_ru_offline = await get_beautiful_report(ip_to_test, country_name_test, flag_test, 'ru')
+        print(report_ru_offline)
+
+        print("\n--- Testing Offline (EN) ---")
+        report_en_offline = await get_beautiful_report(ip_to_test, country_name_test, flag_test, 'en')
+        print(report_en_offline)
         
         print("\n" + "="*30 + "\n")
 
         ip_to_test_up = "8.8.8.8"
         country_name_up = "Google DNS"
         flag_up = "🇺🇸"
-        print(f"--- Тестирование {ip_to_test_up} ---")
-        report_up = await get_beautiful_report(ip_to_test_up, country_name_up, flag_up)
-        print(report_up.replace('*', '').replace('`', ''))
+
+        print("--- Testing Online (RU) ---")
+        report_ru_online = await get_beautiful_report(ip_to_test_up, country_name_up, flag_up, 'ru')
+        print(report_ru_online)
+
+        print("\n--- Testing Online (EN) ---")
+        report_en_online = await get_beautiful_report(ip_to_test_up, country_name_up, flag_up, 'en')
+        print(report_en_online)
 
     asyncio.run(test_ping())
