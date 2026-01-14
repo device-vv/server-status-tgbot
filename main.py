@@ -527,7 +527,10 @@ def main() -> None:
                 ADD_SERVER_COUNTRY_SELECT: [CallbackQueryHandler(add_server_country_selected, pattern="^country_")],
                 ADD_SERVER_IP: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_server_ip_received)],
             },
-            fallbacks=[CommandHandler("cancel", cancel_conversation)],
+            fallbacks=[
+                CommandHandler("cancel", cancel_conversation),
+                MessageHandler(filters.COMMAND, cancel_conversation),
+            ],
             allow_reentry=True,
         )
 
@@ -536,7 +539,10 @@ def main() -> None:
             states={
                 REMOVE_SERVER_SELECT: [CallbackQueryHandler(remove_server_selected, pattern="^remove_")],
             },
-            fallbacks=[CommandHandler("cancel", cancel_conversation)],
+            fallbacks=[
+                CommandHandler("cancel", cancel_conversation),
+                MessageHandler(filters.COMMAND, cancel_conversation),
+            ],
             allow_reentry=True,
         )
 
@@ -545,7 +551,10 @@ def main() -> None:
             states={
                 CHECK_SERVER_SELECT: [CallbackQueryHandler(check_server_selected, pattern="^check_")],
             },
-            fallbacks=[CommandHandler("cancel", cancel_conversation)],
+            fallbacks=[
+                CommandHandler("cancel", cancel_conversation),
+                MessageHandler(filters.COMMAND, cancel_conversation),
+            ],
             allow_reentry=True,
         )
 
@@ -554,7 +563,10 @@ def main() -> None:
             states={
                 CONVERT_GET_URL: [MessageHandler(filters.TEXT & ~filters.COMMAND, convert_url_received)]
             },
-            fallbacks=[CommandHandler("cancel", cancel_conversation)],
+            fallbacks=[
+                CommandHandler("cancel", cancel_conversation),
+                MessageHandler(filters.COMMAND, cancel_conversation),
+            ],
             allow_reentry=True,
         )
         
@@ -563,7 +575,10 @@ def main() -> None:
             states={
                 INTERVAL_SELECT: [CallbackQueryHandler(interval_selected, pattern="^interval_")]
             },
-            fallbacks=[CommandHandler("cancel", cancel_conversation)],
+            fallbacks=[
+                CommandHandler("cancel", cancel_conversation),
+                MessageHandler(filters.COMMAND, cancel_conversation),
+            ],
             allow_reentry=True,
         )
 
